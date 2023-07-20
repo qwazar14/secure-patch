@@ -3,7 +3,7 @@
 Plugin Name: Secure Patch Plugin
 Description: A plugin to increase the security of your WordPress site.
 Author: Maksym "Qwazar" Mezhyrytskyi
-Version: 1.0.5
+Version: 1.0.6
 Author URI: https://github.com/qwazar14/
 Plugin URI: https://github.com/qwazar14/secure-patch
 */
@@ -90,59 +90,9 @@ class SecurePatchPlugin
 
     public function settings_page()
     {
-        ?>
-        <div class="wrap">
-            <h2>Secure Patch Plugin Settings</h2>
-            <form method="post" action="options.php">
-                <?php settings_fields('secure_patch_plugin'); ?>
-                <table class="form-table">
-                    <tr valign="top">
-                        <th scope="row">Disable XML-RPC</th>
-                        <td>
-                            <input type="checkbox" id="disable_xml_rpc" name="secure_patch_plugin[disable_xml_rpc]"
-                                   value="1" <?php checked(1, $this->options['disable_xml_rpc'], true); ?> />
-                            <label for="disable_xml_rpc">Disable XML-RPC</label>
-                        </td>
-                    </tr>
-                    <tr valign="top">
-                        <th scope="row">Disable File Edit</th>
-                        <td>
-                            <input type="checkbox" id="disable_file_edit" name="secure_patch_plugin[disable_file_edit]"
-                                   value="1" <?php checked(1, $this->options['disable_file_edit'], true); ?> />
-                            <label for="disable_file_edit">Disable File Edit</label>
-                        </td>
-                    </tr>
-                    <tr valign="top">
-                        <th scope="row">Remove WordPress Version</th>
-                        <td>
-                            <input type="checkbox" id="remove_wp_version" name="secure_patch_plugin[remove_wp_version]"
-                                   value="1" <?php checked(1, $this->options['remove_wp_version'], true); ?> />
-                            <label for="remove_wp_version">Remove WordPress Version</label>
-                        </td>
-                    </tr>
-                    <tr valign="top">
-                        <th scope="row">Enforce Strong Passwords</th>
-                        <td>
-                            <input type="checkbox" id="enforce_strong_passwords"
-                                   name="secure_patch_plugin[enforce_strong_passwords]"
-                                   value="1" <?php checked(1, $this->options['enforce_strong_passwords'], true); ?> />
-                            <label for="enforce_strong_passwords">Enforce Strong Passwords</label>
-                        </td>
-                    </tr>
-                    <tr valign="top">
-                        <th scope="row">Disable REST API</th>
-                        <td>
-                            <input type="checkbox" id="disable_rest_api" name="secure_patch_plugin[disable_rest_api]"
-                                   value="1" <?php checked(1, $this->options['disable_rest_api'], true); ?> />
-                            <label for="disable_rest_api">Disable REST API</label>
-                        </td>
-                    </tr>
-                </table>
-                <?php submit_button(); ?>
-            </form>
-        </div>
-        <?php
+        include 'settings_page.php';
     }
+
 
     public function validate_options($input)
     {
