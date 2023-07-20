@@ -39,6 +39,11 @@ class SecurePatchPlugin
     // Change the login URL
     public function login_protect()
     {
+        error_log("Checking login_protect...");
+        error_log("SCRIPT_NAME: " . $_SERVER['SCRIPT_NAME']);
+        error_log("REQUEST_METHOD: " . $_SERVER['REQUEST_METHOD']);
+        error_log("GET: " . print_r($_GET, true));
+
         if (strpos($_SERVER['SCRIPT_NAME'], 'wp-login.php') !== false && $_SERVER['REQUEST_METHOD'] == 'GET' && (empty($_GET) || (!empty($_GET) && empty($_GET['action'])))) {
             if (isset($_GET['key']) && $_GET['key'] === SECURE_LOGIN_KEY) {
                 return;
