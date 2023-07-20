@@ -3,24 +3,23 @@
 Plugin Name: Secure Patch Plugin
 Description: A plugin to increase the security of your WordPress site.
 Author: Maksym "Qwazar" Mezhyrytskyi
-Version: 1.0.1
+Version: 1.0.3
 Author URI: https://github.com/qwazar14/
+Plugin URI: https://github.com/qwazar14/secure-patch
 */
 
 class SecurePatchPlugin
 {
-    public $is_404 = false;  // Initialized here
-
     public function __construct()
     {
         remove_action('wp_head', 'wp_generator');
         add_filter('the_generator', [$this, 'remove_version_info']);
         add_filter('style_loader_src', [$this, 'remove_version_from_style_js'], 9999);
         add_filter('script_loader_src', [$this, 'remove_version_from_style_js'], 9999);
-        add_action('login_enqueue_scripts', [$this, 'login_protect']);
-        add_action('plugins_loaded', [$this, 'redirect_login_page']);
-        add_filter('site_url', [$this, 'wplogin_filter'], 10, 3);
-        add_action('template_redirect', [$this, 'do_404']);
+        add_filter('xmlrpc_enabled', '__return_false');
+        define('DISALLOW_FILE_EDIT', true);
+        add_filter('password_enforce_strong_password', [$this, 'enforce_strong_password']);
+        add_filter('rest_authentication_errors', [$this, 'disable_rest_api']);
     }
 
     public function remove_version_info()
@@ -36,54 +35,25 @@ class SecurePatchPlugin
         return $src;
     }
 
-    // Change the login URL
-    public function login_protect()
+    public function enforce_strong_password($user)
     {
-        error_log("Checking login_protect...");
-        error_log("SCRIPT_NAME: " . $_SERVER['SCRIPT_NAME']);
-        error_log("REQUEST_METHOD: " . $_SERVER['REQUEST_METHOD']);
-        error_log("GET: " . print_r($_GET, true));
-
-        if (strpos($_SERVER['SCRIPT_NAME'], 'wp-login.php') !== false && $_SERVER['REQUEST_METHOD'] == 'GET' && (empty($_GET) || (!empty($_GET) && empty($_GET['action'])))) {
-            if (isset($_GET['key']) && $_GET['key'] === SECURE_LOGIN_KEY) {
-                return;
-            } else {
-                $this->is_404 = true;
-            }
+        $enforce = false;
+        if (user_can($user, 'publish_posts')) {
+            $enforce = true;
         }
+        return $enforce;
     }
 
-    public function redirect_login_page()
+    public function disable_rest_api($result)
     {
-        if (isset($_SERVER['REQUEST_URI'])) {
-            $path = ltrim($_SERVER['REQUEST_URI'], '/');
-            if ($path == 'wp-login.php' || $path == 'wp-admin/' || $path == 'wp-admin') {
-                $this->is_404 = true;
-            }
+        if (!empty($result)) {
+            return $result;
         }
-    }
-
-    public function wplogin_filter($url, $path, $orig_scheme)
-    {
-        if ($path == 'wp-login.php') {
-            $url = str_replace('wp-login.php', SECURE_LOGIN_SLUG . '?key=' . SECURE_LOGIN_KEY, $url);
+        if (!is_user_logged_in()) {
+            return new WP_Error('rest_not_logged_in', 'You are not currently logged in.', array('status' => 401));
         }
-        return $url;
-    }
-
-    public function do_404()
-    {
-        if ($this->is_404) {
-            global $wp_query;
-            $wp_query->set_404();
-            status_header(404);
-            nocache_headers();
-            include(get_query_template('404'));
-            die();
-        }
+        return $result;
     }
 }
 
 new SecurePatchPlugin();
-
-?>
