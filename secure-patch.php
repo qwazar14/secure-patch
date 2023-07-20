@@ -3,12 +3,14 @@
 Plugin Name: Secure Patch Plugin
 Description: A plugin to increase the security of your WordPress site.
 Author: Maksym "Qwazar" Mezhyrytskyi
-Version: 1.0.0
+Version: 1.0.1
 Author URI: https://github.com/qwazar14/
 */
 
 class SecurePatchPlugin
 {
+    public $is_404 = false;  // Initialized here
+
     public function __construct()
     {
         remove_action('wp_head', 'wp_generator');
