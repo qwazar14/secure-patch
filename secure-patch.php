@@ -3,7 +3,7 @@
 Plugin Name: Secure Patch Plugin
 Description: A plugin to increase the security of your WordPress site.
 Author: Maksym "Qwazar" Mezhyrytskyi
-Version: 1.0.6
+Version: 1.0.7
 Author URI: https://github.com/qwazar14/
 Plugin URI: https://github.com/qwazar14/secure-patch
 */
@@ -11,6 +11,9 @@ Plugin URI: https://github.com/qwazar14/secure-patch
 class SecurePatchPlugin
 {
     private $options;
+
+    const MAX_LOGIN_ATTEMPTS = 5;
+    const LOCK_DURATION = 60;  // In seconds
 
     public function __construct()
     {
@@ -47,6 +50,11 @@ class SecurePatchPlugin
 
         register_setting('secure_patch_plugin', 'secure_patch_plugin', [$this, 'validate_options']);
         add_action('admin_menu', [$this, 'admin_menu']);
+        add_action('wp_login_failed', [$this, 'handle_failed_login']);
+        add_filter('authenticate', [$this, 'authenticate_user'], 30, 3);
+        add_filter('login_errors', [$this, 'modify_login_errors']);
+        add_action('plugins_loaded', [$this, 'load_textdomain']);
+        add_filter('login_errors', [$this, 'modify_login_errors']);
     }
 
     public function remove_version_from_style_js($src)
@@ -103,6 +111,61 @@ class SecurePatchPlugin
         $newinput['disable_rest_api'] = isset($input['disable_rest_api']) ? 1 : 0;
         return $newinput;
     }
+
+    public function handle_failed_login($username)
+    {
+        $ip = $_SERVER['REMOTE_ADDR'];
+
+        $transient_name = 'secure_patch_failed_login_' . str_replace('.', '_', $ip);
+        $failed_attempts = (int)get_transient($transient_name);
+
+        if ($failed_attempts >= self::MAX_LOGIN_ATTEMPTS) {
+            // The IP is already locked, do nothing
+            return;
+        }
+
+        $failed_attempts++;
+
+        if ($failed_attempts >= self::MAX_LOGIN_ATTEMPTS) {
+            // Lock the IP
+            $this->lock_ip($ip);
+            return;
+        }
+
+        // Save the increased number of failed attempts
+        set_transient($transient_name, $failed_attempts, self::LOCK_DURATION);
+    }
+
+    public function lock_ip($ip)
+    {
+        // Set a transient to mark the IP as locked
+        set_transient('secure_patch_locked_ip_' . str_replace('.', '_', $ip), true, self::LOCK_DURATION);
+    }
+
+    public function is_ip_locked($ip)
+    {
+        return (bool)get_transient('secure_patch_locked_ip_' . str_replace('.', '_', $ip));
+    }
+
+    public function authenticate_user($user, $username, $password)
+    {
+        if ($this->is_ip_locked($_SERVER['REMOTE_ADDR'])) {
+            // The IP is locked, prevent authentication
+            return new WP_Error('authentication_failed', 'You have exceeded the maximum number of login attempts. Please try again later.');
+        }
+
+        return $user;
+    }
+
+    public function load_textdomain() {
+        load_plugin_textdomain('secure-patch-plugin', false, basename(dirname(__FILE__)) . '/languages/');
+    }
+
+    public function modify_login_errors()
+    {
+        return 'The entered login information is incorrect. Please try again.';
+    }
+
 }
 
 new SecurePatchPlugin();
