@@ -3,17 +3,17 @@
 Plugin Name: Secure Patch Plugin
 Description: A plugin to increase the security of your WordPress site.
 Author: Maksym "Qwazar" Mezhyrytskyi
-Version: 1.0.7
+Version: 1.0.8
 Author URI: https://github.com/qwazar14/
 Plugin URI: https://github.com/qwazar14/secure-patch
 */
 
+require_once plugin_dir_path(__FILE__) . 'settings_page.php';
+require_once plugin_dir_path(__FILE__) . 'security_check_page.php';
+
 class SecurePatchPlugin
 {
     private $options;
-
-    const MAX_LOGIN_ATTEMPTS = 5;
-    const LOCK_DURATION = 60;  // In seconds
 
     public function __construct()
     {
@@ -22,7 +22,9 @@ class SecurePatchPlugin
             'disable_file_edit' => 0,
             'remove_wp_version' => 0,
             'enforce_strong_passwords' => 0,
-            'disable_rest_api' => 0
+            'disable_rest_api' => 0,
+            'max_login_attempts' => 5,
+            'lock_duration' => 60
         ]);
 
         if ($this->options['disable_xml_rpc']) {
@@ -54,7 +56,6 @@ class SecurePatchPlugin
         add_filter('authenticate', [$this, 'authenticate_user'], 30, 3);
         add_filter('login_errors', [$this, 'modify_login_errors']);
         add_action('plugins_loaded', [$this, 'load_textdomain']);
-        add_filter('login_errors', [$this, 'modify_login_errors']);
     }
 
     public function remove_version_from_style_js($src)
@@ -92,15 +93,9 @@ class SecurePatchPlugin
             'Secure Patch Plugin',
             'manage_options',
             'secure-patch-plugin',
-            [$this, 'settings_page']
+            'secure_patch_settings_page'
         );
     }
-
-    public function settings_page()
-    {
-        include 'settings_page.php';
-    }
-
 
     public function validate_options($input)
     {
@@ -109,6 +104,8 @@ class SecurePatchPlugin
         $newinput['remove_wp_version'] = isset($input['remove_wp_version']) ? 1 : 0;
         $newinput['enforce_strong_passwords'] = isset($input['enforce_strong_passwords']) ? 1 : 0;
         $newinput['disable_rest_api'] = isset($input['disable_rest_api']) ? 1 : 0;
+        $newinput['max_login_attempts'] = absint($input['max_login_attempts']);
+        $newinput['lock_duration'] = absint($input['lock_duration']);
         return $newinput;
     }
 
@@ -119,27 +116,23 @@ class SecurePatchPlugin
         $transient_name = 'secure_patch_failed_login_' . str_replace('.', '_', $ip);
         $failed_attempts = (int)get_transient($transient_name);
 
-        if ($failed_attempts >= self::MAX_LOGIN_ATTEMPTS) {
-            // The IP is already locked, do nothing
+        if ($failed_attempts >= $this->options['max_login_attempts']) {
             return;
         }
 
         $failed_attempts++;
 
-        if ($failed_attempts >= self::MAX_LOGIN_ATTEMPTS) {
-            // Lock the IP
+        if ($failed_attempts >= $this->options['max_login_attempts']) {
             $this->lock_ip($ip);
             return;
         }
 
-        // Save the increased number of failed attempts
-        set_transient($transient_name, $failed_attempts, self::LOCK_DURATION);
+        set_transient($transient_name, $failed_attempts, $this->options['lock_duration']);
     }
 
     public function lock_ip($ip)
     {
-        // Set a transient to mark the IP as locked
-        set_transient('secure_patch_locked_ip_' . str_replace('.', '_', $ip), true, self::LOCK_DURATION);
+        set_transient('secure_patch_locked_ip_' . str_replace('.', '_', $ip), true, $this->options['lock_duration']);
     }
 
     public function is_ip_locked($ip)
@@ -150,14 +143,13 @@ class SecurePatchPlugin
     public function authenticate_user($user, $username, $password)
     {
         if ($this->is_ip_locked($_SERVER['REMOTE_ADDR'])) {
-            // The IP is locked, prevent authentication
             return new WP_Error('authentication_failed', 'You have exceeded the maximum number of login attempts. Please try again later.');
         }
-
         return $user;
     }
 
-    public function load_textdomain() {
+    public function load_textdomain()
+    {
         load_plugin_textdomain('secure-patch-plugin', false, basename(dirname(__FILE__)) . '/languages/');
     }
 
